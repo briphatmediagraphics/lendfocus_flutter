@@ -33,6 +33,11 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Local Laravel backend configuration
+/backend/.env
+/backend/.env.*
+!/backend/.env.example
+
 # Symbolication related
 app.*.symbols
 

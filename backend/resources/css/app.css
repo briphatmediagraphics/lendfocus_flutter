@@ -1,0 +1,194 @@
+@import "tailwindcss";
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-bright: var(--brand-bright);
+  --color-brand-soft: var(--brand-soft);
+
+  --font-display: "Plus Jakarta Sans", "Inter", system-ui, sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
+
+  --shadow-soft: 0 8px 24px -8px oklch(0.35 0.1 250 / 0.18);
+  --shadow-card: 0 4px 16px -4px oklch(0.35 0.1 250 / 0.12);
+  --gradient-hero: linear-gradient(135deg, oklch(0.30 0.12 255) 0%, oklch(0.45 0.18 250) 60%, oklch(0.55 0.20 235) 100%);
+  --gradient-brand: linear-gradient(135deg, oklch(0.40 0.18 255), oklch(0.55 0.22 240));
+}
+
+:root {
+  --radius: 0.75rem;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.18 0.04 255);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.18 0.04 255);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.18 0.04 255);
+  --primary: oklch(0.38 0.16 255);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.96 0.015 250);
+  --secondary-foreground: oklch(0.25 0.08 255);
+  --muted: oklch(0.97 0.01 250);
+  --muted-foreground: oklch(0.50 0.03 255);
+  --accent: oklch(0.55 0.20 240);
+  --accent-foreground: oklch(0.99 0 0);
+  --destructive: oklch(0.58 0.22 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.92 0.015 250);
+  --input: oklch(0.92 0.015 250);
+  --ring: oklch(0.55 0.20 240);
+  --brand-deep: oklch(0.28 0.12 258);
+  --brand-bright: oklch(0.55 0.22 240);
+  --brand-soft: oklch(0.95 0.03 250);
+}
+
+@layer base {
+  * { border-color: var(--color-border); }
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.02em; }
+}
+
+@utility hero-gradient { background-image: var(--gradient-hero); }
+@utility brand-gradient { background-image: var(--gradient-brand); }
+@utility text-gradient {
+  background-image: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@layer components {
+  .lf-btn {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50;
+  }
+  .lf-btn-default { @apply bg-primary text-primary-foreground shadow hover:bg-primary/90 h-9 px-4 py-2; }
+  .lf-btn-outline { @apply border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2; }
+  .lf-btn-ghost { @apply hover:bg-accent hover:text-accent-foreground h-9 px-4 py-2; }
+  .lf-btn-lg { @apply h-10 px-8; }
+  .lf-btn-sm { @apply h-8 px-3 text-xs; }
+  .lf-input {
+    @apply flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm;
+  }
+  .lf-textarea {
+    @apply flex min-h-[60px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring md:text-sm;
+  }
+  .lf-label { @apply text-sm font-medium leading-none; }
+}
+
+@layer base {
+  .splash-screen {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at top, rgba(255, 255, 255, 0.16), transparent 35%), linear-gradient(180deg, var(--primary) 0%, var(--background) 100%);
+    color: var(--primary-foreground);
+    backdrop-filter: blur(8px);
+  }
+  .splash-brand {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1.5rem 2rem;
+    border-radius: 2rem;
+    box-shadow: 0 20px 80px rgba(0, 0, 0, 0.18);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .splash-ring {
+    position: relative;
+    width: 120px;
+    height: 120px;
+    display: grid;
+    place-items: center;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+  }
+  .splash-ring::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    border: 5px solid rgba(255, 255, 255, 0.18);
+    border-top-color: rgba(255, 255, 255, 0.95);
+    animation: splash-ring-spin 0.8s linear infinite;
+  }
+  .splash-logo {
+    width: 80px;
+    height: 80px;
+    border-radius: 24px;
+    z-index: 1;
+    animation: splash-logo-pop 0.8s ease-in-out forwards;
+  }
+  .splash-title {
+    font-family: var(--font-display);
+    font-size: clamp(1.9rem, 5vw, 3rem);
+    letter-spacing: -0.04em;
+    font-weight: 900;
+    text-align: center;
+    animation: splash-text-fade 1.2s ease-in-out forwards;
+  }
+  .splash-subtitle {
+    color: rgba(255, 255, 255, 0.88);
+    font-size: 1rem;
+    line-height: 1.6;
+    text-align: center;
+    max-width: 26rem;
+    opacity: 0;
+    animation: splash-text-fade 1.2s ease-in-out forwards;
+    animation-delay: 0.1s;
+  }
+  @keyframes splash-ring-spin { to { transform: rotate(360deg); } }
+  @keyframes splash-logo-pop {
+    0% { transform: scale(0.7); opacity: 0; }
+    45% { transform: scale(1.12); opacity: 1; }
+    70% { transform: scale(0.96); }
+    100% { transform: scale(0.96); opacity: 0; }
+  }
+  @keyframes splash-text-fade {
+    0% { opacity: 0; transform: translateY(12px); }
+    20% { opacity: 1; transform: translateY(0); }
+    80% { opacity: 1; }
+    100% { opacity: 0; transform: translateY(-8px); }
+  }
+}
