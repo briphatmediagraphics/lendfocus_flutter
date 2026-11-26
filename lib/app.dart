@@ -1,124 +1,240 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'features/account/account_pages.dart';
+import 'features/auth/auth_pages.dart';
 import 'models/property.dart';
+import 'providers/app_providers.dart';
 import 'services/landfocus_api.dart';
+import 'services/session_store.dart';
 
 String tr(BuildContext context, String swahili, String english) =>
     Localizations.localeOf(context).languageCode == 'sw' ? swahili : english;
 
-class LandFocusApp extends StatefulWidget {
-  const LandFocusApp({super.key, required this.api});
-
-  final LandFocusApi api;
-
-  @override
-  State<LandFocusApp> createState() => _LandFocusAppState();
-}
-
-class _LandFocusAppState extends State<LandFocusApp> {
-  Locale _locale = const Locale('sw');
-
-  void _toggleLanguage() {
-    setState(() {
-      _locale = Locale(_locale.languageCode == 'sw' ? 'en' : 'sw');
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    const brand = Color(0xFF17457A);
-    return MaterialApp(
-      title: 'LandFocus',
-      debugShowCheckedModeBanner: false,
-      locale: _locale,
-      supportedLocales: const [Locale('sw'), Locale('en')],
-      localizationsDelegates: GlobalMaterialLocalizations.delegates,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: brand,
-          surface: Colors.white,
-        ),
-        scaffoldBackgroundColor: Colors.white,
-        useMaterial3: true,
-        textTheme: ThemeData.light().textTheme.apply(
-          bodyColor: const Color(0xFF252B35),
-          displayColor: const Color(0xFF252B35),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.white,
-          surfaceTintColor: Colors.transparent,
-          centerTitle: false,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Color(0xFFE4E8EE)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: Color(0xFFE4E8EE)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(color: brand, width: 1.5),
-          ),
-        ),
-      ),
-      home: HomeShell(
-        api: widget.api,
-        locale: _locale,
-        onToggleLanguage: _toggleLanguage,
-      ),
-    );
-  }
-}
-
-class HomeShell extends StatefulWidget {
-  const HomeShell({
+class LandFocusApp extends StatelessWidget {
+  const LandFocusApp({
     super.key,
     required this.api,
-    required this.locale,
-    required this.onToggleLanguage,
+    this.sessionStore,
   });
 
   final LandFocusApi api;
-  final Locale locale;
-  final VoidCallback onToggleLanguage;
-
-  @override
-  State<HomeShell> createState() => _HomeShellState();
-}
-
-class _HomeShellState extends State<HomeShell> {
-  int _selectedTab = 0;
-
-  void _openProperty(Property property) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => PropertyDetailPage(
-          api: widget.api,
-          propertyId: property.id,
-          onBook: (id) => _openBooking(propertyId: id),
-        ),
-      ),
-    );
-  }
-
-  void _openBooking({String? propertyId}) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) =>
-            BookingPage(api: widget.api, initialPropertyId: propertyId),
-      ),
-    );
-  }
+  final SessionStore? sessionStore;
 
   @override
   Widget build(BuildContext context) {
+    return ProviderScope(
+      overrides: [
+        landFocusApiProvider.overrideWithValue(api),
+        sessionStoreProvider.overrideWithValue(
+          sessionStore ?? MemorySessionStore(),
+        ),
+      ],
+      child: const _LandFocusAppView(),
+    );
+  }
+}
+
+class _LandFocusAppView extends ConsumerWidget {
+  const _LandFocusAppView();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    const brand = Color(0xFF17457A);
+    final locale = ref.watch(localeProvider);
+    final darkMode = ref.watch(darkModeProvider);
+    return MaterialApp.router(
+      routerConfig: ref.watch(appRouterProvider),
+      title: 'LandFocus',
+      debugShowCheckedModeBanner: false,
+      locale: locale,
+      supportedLocales: const [Locale('sw'), Locale('en')],
+      localizationsDelegates: GlobalMaterialLocalizations.delegates,
+      theme: _appTheme(brand, Brightness.light),
+      darkTheme: _appTheme(brand, Brightness.dark),
+      themeMode: darkMode ? ThemeMode.dark : ThemeMode.light,
+    );
+  }
+}
+
+ThemeData _appTheme(Color brand, Brightness brightness) {
+  final scheme = ColorScheme.fromSeed(
+    seedColor: brand,
+    brightness: brightness,
+    surface: brightness == Brightness.light
+        ? Colors.white
+        : const Color(0xFF171D25),
+  );
+  return ThemeData.from(colorScheme: scheme).copyWith(
+    colorScheme: scheme,
+    scaffoldBackgroundColor: scheme.surface,
+    textTheme: ThemeData.from(colorScheme: scheme).textTheme.apply(
+      bodyColor: scheme.onSurface,
+      displayColor: scheme.onSurface,
+    ),
+    appBarTheme: AppBarTheme(
+      backgroundColor: scheme.surface,
+      surfaceTintColor: Colors.transparent,
+      centerTitle: false,
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: scheme.surface,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: scheme.outlineVariant),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: scheme.outlineVariant),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10),
+        borderSide: BorderSide(color: scheme.primary, width: 1.5),
+      ),
+    ),
+  );
+}
+
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final refresh = _RouterRefreshNotifier();
+  ref.listen(authControllerProvider, (_, _) => refresh.refresh());
+  final api = ref.read(landFocusApiProvider);
+
+  final router = GoRouter(
+    initialLocation: '/splash',
+    refreshListenable: refresh,
+    redirect: (context, state) {
+      final auth = ref.read(authControllerProvider);
+      final location = state.matchedLocation;
+      final isSplash = location == '/splash';
+      final isAuthRoute = {
+        '/login',
+        '/register',
+        '/forgot-password',
+        '/reset-password',
+      }.contains(location);
+      final requiresAccount = location == '/profile' || location == '/profile/edit';
+
+      if (auth.isLoading && !isSplash && !isAuthRoute && !requiresAccount) {
+        return '/splash';
+      }
+      final session = auth.asData?.value;
+      if (requiresAccount && session == null) {
+        final destination = Uri.encodeComponent(state.uri.toString());
+        return '/login?redirect=$destination';
+      }
+      if (session != null && isAuthRoute) {
+        return state.uri.queryParameters['redirect'] ?? '/home';
+      }
+      return null;
+    },
+    routes: [
+      GoRoute(path: '/', redirect: (_, _) => '/splash'),
+      GoRoute(
+        path: '/splash',
+        builder: (_, _) => const SplashPage(),
+      ),
+      GoRoute(
+        path: '/onboarding',
+        builder: (_, _) => const OnboardingPage(),
+      ),
+      GoRoute(path: '/login', builder: (_, _) => const LoginPage()),
+      GoRoute(path: '/register', builder: (_, _) => const RegisterPage()),
+      GoRoute(
+        path: '/forgot-password',
+        builder: (_, _) => const ForgotPasswordPage(),
+      ),
+      GoRoute(
+        path: '/reset-password',
+        builder: (_, _) => const ResetPasswordPage(),
+      ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) =>
+            MainShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/home',
+                builder: (context, state) => HomeTab(
+                  api: api,
+                  onBrowse: () => context.go('/properties'),
+                  onContact: () => context.go('/contact'),
+                  onOpenProperty: (property) =>
+                      context.push('/properties/${property.id}'),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/properties',
+                builder: (context, state) => PropertiesTab(
+                  api: api,
+                  onOpenProperty: (property) =>
+                      context.push('/properties/${property.id}'),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/book',
+                builder: (context, state) => BookingPage(
+                  api: api,
+                  initialPropertyId: state.uri.queryParameters['property_id'],
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/contact',
+                builder: (_, _) => ContactPage(api: api),
+              ),
+            ],
+          ),
+        ],
+      ),
+      GoRoute(
+        path: '/properties/:id',
+        builder: (context, state) => PropertyDetailPage(
+          api: api,
+          propertyId: state.pathParameters['id']!,
+          onBook: (id) => context.go('/book?property_id=$id'),
+        ),
+      ),
+      GoRoute(path: '/profile', builder: (_, _) => const ProfilePage()),
+      GoRoute(path: '/profile/edit', builder: (_, _) => const ProfileEditPage()),
+      GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
+    ],
+  );
+
+  ref.onDispose(() {
+    router.dispose();
+    refresh.dispose();
+  });
+  return router;
+});
+
+class _RouterRefreshNotifier extends ChangeNotifier {
+  void refresh() => notifyListeners();
+}
+
+class MainShell extends ConsumerWidget {
+  const MainShell({super.key, required this.navigationShell});
+
+  final StatefulNavigationShell navigationShell;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final isWide = MediaQuery.sizeOf(context).width > 800;
     final labels = [
       tr(context, 'Nyumbani', 'Home'),
@@ -126,17 +242,7 @@ class _HomeShellState extends State<HomeShell> {
       tr(context, 'Miadi', 'Book'),
       tr(context, 'Wasiliana', 'Contact'),
     ];
-    final tabs = [
-      HomeTab(
-        api: widget.api,
-        onBrowse: () => setState(() => _selectedTab = 1),
-        onContact: () => setState(() => _selectedTab = 3),
-        onOpenProperty: _openProperty,
-      ),
-      PropertiesTab(api: widget.api, onOpenProperty: _openProperty),
-      BookingPage(api: widget.api),
-      ContactPage(api: widget.api),
-    ];
+    final selectedIndex = navigationShell.currentIndex;
 
     return Scaffold(
       appBar: AppBar(
@@ -173,35 +279,37 @@ class _HomeShellState extends State<HomeShell> {
           if (isWide)
             for (var index = 0; index < labels.length; index++)
               TextButton(
-                onPressed: () => setState(() => _selectedTab = index),
+                onPressed: () => navigationShell.goBranch(index),
                 child: Text(
                   labels[index],
-                  style: TextStyle(
-                    color: _selectedTab == index
-                        ? const Color(0xFF17457A)
-                        : const Color(0xFF626B78),
-                    fontWeight: _selectedTab == index
-                        ? FontWeight.w700
-                        : FontWeight.w500,
-                  ),
+                  style: TextStyle(fontWeight: selectedIndex == index ? FontWeight.w700 : FontWeight.w500),
                 ),
               ),
           TextButton(
-            onPressed: widget.onToggleLanguage,
-            child: Text(widget.locale.languageCode == 'sw' ? 'EN' : 'SW'),
+            onPressed: ref.read(localeProvider.notifier).toggle,
+            child: Text(ref.watch(localeProvider).languageCode == 'sw' ? 'EN' : 'SW'),
+          ),
+          IconButton(
+            tooltip: tr(context, 'Mipangilio', 'Settings'),
+            onPressed: () => context.go('/settings'),
+            icon: const Icon(Icons.settings_outlined),
+          ),
+          IconButton(
+            tooltip: tr(context, 'Akaunti yangu', 'My account'),
+            onPressed: () => context.go('/profile'),
+            icon: const Icon(Icons.person_outline),
           ),
           const SizedBox(width: 8),
         ],
       ),
-      body: IndexedStack(index: _selectedTab, children: tabs),
+      body: navigationShell,
       bottomNavigationBar: isWide
           ? null
           : NavigationBar(
               backgroundColor: Colors.white,
               indicatorColor: const Color(0xFFEAF1F9),
-              selectedIndex: _selectedTab,
-              onDestinationSelected: (index) =>
-                  setState(() => _selectedTab = index),
+                selectedIndex: selectedIndex,
+                onDestinationSelected: (index) => navigationShell.goBranch(index),
               destinations: [
                 NavigationDestination(
                   icon: const Icon(Icons.home_outlined),
@@ -229,7 +337,7 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
-class HomeTab extends StatefulWidget {
+class HomeTab extends ConsumerStatefulWidget {
   const HomeTab({
     super.key,
     required this.api,
@@ -244,26 +352,15 @@ class HomeTab extends StatefulWidget {
   final ValueChanged<Property> onOpenProperty;
 
   @override
-  State<HomeTab> createState() => _HomeTabState();
+  ConsumerState<HomeTab> createState() => _HomeTabState();
 }
 
-class _HomeTabState extends State<HomeTab> {
-  late Future<List<Property>> _properties;
-  late Future<List<Map<String, dynamic>>> _services;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  void _load() {
-    _properties = widget.api.properties(limit: 6);
-    _services = widget.api.services();
-  }
-
+class _HomeTabState extends ConsumerState<HomeTab> {
   @override
   Widget build(BuildContext context) {
+    const propertyQuery = (type: null, limit: 6);
+    final propertiesAsync = ref.watch(propertiesProvider(propertyQuery));
+    final servicesAsync = ref.watch(servicesProvider);
     final width = MediaQuery.sizeOf(context).width;
     final columns = width > 1000
         ? 3
@@ -271,7 +368,18 @@ class _HomeTabState extends State<HomeTab> {
         ? 2
         : 1;
     return RefreshIndicator(
-      onRefresh: () async => setState(_load),
+      onRefresh: () async {
+        ref.invalidate(propertiesProvider(propertyQuery));
+        ref.invalidate(servicesProvider);
+        try {
+          await Future.wait([
+            ref.read(propertiesProvider(propertyQuery).future),
+            ref.read(servicesProvider.future),
+          ]);
+        } on Object {
+          // The refreshed providers render their own error state.
+        }
+      },
       child: ListView(
         padding: EdgeInsets.zero,
         children: [
@@ -420,17 +528,8 @@ class _HomeTabState extends State<HomeTab> {
             action: tr(context, 'Tazama zote', 'See all'),
             onAction: widget.onBrowse,
           ),
-          FutureBuilder<List<Property>>(
-            future: _properties,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return _ErrorPanel(
-                  message: snapshot.error.toString(),
-                  onRetry: () => setState(_load),
-                );
-              }
-              if (!snapshot.hasData) return const _LoadingPanel();
-              final properties = snapshot.data!;
+          propertiesAsync.when(
+            data: (properties) {
               if (properties.isEmpty) {
                 return _EmptyPanel(
                   message: tr(
@@ -446,6 +545,11 @@ class _HomeTabState extends State<HomeTab> {
                 onTap: widget.onOpenProperty,
               );
             },
+            error: (error, _) => _ErrorPanel(
+              message: error.toString(),
+              onRetry: () => ref.invalidate(propertiesProvider(propertyQuery)),
+            ),
+            loading: () => const _LoadingPanel(),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 30, 20, 6),
@@ -466,17 +570,9 @@ class _HomeTabState extends State<HomeTab> {
               style: TextStyle(color: Colors.grey.shade700),
             ),
           ),
-          FutureBuilder<List<Map<String, dynamic>>>(
-            future: _services,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return _ErrorPanel(
-                  message: snapshot.error.toString(),
-                  onRetry: () => setState(_load),
-                );
-              }
-              if (!snapshot.hasData) return const _LoadingPanel();
-              final services = snapshot.data!.take(8).toList();
+          servicesAsync.when(
+            data: (allServices) {
+              final services = allServices.take(8).toList();
               if (services.isEmpty) {
                 return _EmptyPanel(
                   message: tr(
@@ -546,6 +642,11 @@ class _HomeTabState extends State<HomeTab> {
                 ),
               );
             },
+            error: (error, _) => _ErrorPanel(
+              message: error.toString(),
+              onRetry: () => ref.invalidate(servicesProvider),
+            ),
+            loading: () => const _LoadingPanel(),
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 42, 20, 18),
@@ -656,7 +757,7 @@ String _localized(dynamic value, String language) {
   return '';
 }
 
-class PropertiesTab extends StatefulWidget {
+class PropertiesTab extends ConsumerStatefulWidget {
   const PropertiesTab({
     super.key,
     required this.api,
@@ -667,25 +768,16 @@ class PropertiesTab extends StatefulWidget {
   final ValueChanged<Property> onOpenProperty;
 
   @override
-  State<PropertiesTab> createState() => _PropertiesTabState();
+  ConsumerState<PropertiesTab> createState() => _PropertiesTabState();
 }
 
-class _PropertiesTabState extends State<PropertiesTab> {
+class _PropertiesTabState extends ConsumerState<PropertiesTab> {
   String? _type;
-  late Future<List<Property>> _properties;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  void _load() {
-    _properties = widget.api.properties(type: _type);
-  }
 
   @override
   Widget build(BuildContext context) {
+    final propertyQuery = (type: _type, limit: 24);
+    final propertiesAsync = ref.watch(propertiesProvider(propertyQuery));
     final filters = <(String?, String)>[
       (null, tr(context, 'Zote', 'All')),
       ('land', tr(context, 'Ardhi', 'Land')),
@@ -735,7 +827,6 @@ class _PropertiesTabState extends State<PropertiesTab> {
                             selected: _type == filter.$1,
                             onSelected: (_) => setState(() {
                               _type = filter.$1;
-                              _load();
                             }),
                           ),
                         ),
@@ -748,17 +839,9 @@ class _PropertiesTabState extends State<PropertiesTab> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(0, 16, 0, 24),
-          child: FutureBuilder<List<Property>>(
-            future: _properties,
-            builder: (context, snapshot) {
-              if (snapshot.hasError) {
-                return _ErrorPanel(
-                  message: snapshot.error.toString(),
-                  onRetry: () => setState(_load),
-                );
-              }
-              if (!snapshot.hasData) return const _LoadingPanel();
-              if (snapshot.data!.isEmpty) {
+          child: propertiesAsync.when(
+            data: (properties) {
+              if (properties.isEmpty) {
                 return _EmptyPanel(
                   message: tr(
                     context,
@@ -768,11 +851,16 @@ class _PropertiesTabState extends State<PropertiesTab> {
                 );
               }
               return _PropertyGrid(
-                properties: snapshot.data!,
+                properties: properties,
                 columns: columns,
                 onTap: widget.onOpenProperty,
               );
             },
+            error: (error, _) => _ErrorPanel(
+              message: error.toString(),
+              onRetry: () => ref.invalidate(propertiesProvider(propertyQuery)),
+            ),
+            loading: () => const _LoadingPanel(),
           ),
         ),
         const _SiteFooter(),

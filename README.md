@@ -1,9 +1,8 @@
 # LandFocus Flutter app
 
-The public LandFocus app for Android, web, and Windows. It uses the LandFocus
-Laravel API and its project-local SQLite database. Flutter does not connect to
-the database directly and
-does not use Supabase.
+The LandFocus Flutter app for Android, web, and Windows. It uses the Laravel API
+and its project-local SQLite database. Flutter never connects to the database
+directly.
 
 ## Requirements
 
@@ -45,19 +44,33 @@ flutter run
 ```
 
 The default API base URL is `http://10.0.2.2:8000/api` on the Android emulator
-and `http://localhost:8000/api` on Windows and web. Override it when the server
-is hosted elsewhere:
+and `http://localhost:8000/api` on Windows and web. Set `API_BASE_URL` to
+override it:
 
 ```powershell
-flutter run -d android --dart-define=LANDFOCUS_API_URL=http://10.0.2.2:8000/api
-flutter run -d chrome --dart-define=LANDFOCUS_API_URL=http://localhost:8000/api
-flutter run -d windows --dart-define=LANDFOCUS_API_URL=http://localhost:8000/api
+flutter run -d android --dart-define=API_BASE_URL=http://10.0.2.2:8000/api
+flutter run -d chrome --dart-define=API_BASE_URL=http://localhost:8000/api
+flutter run -d windows --dart-define=API_BASE_URL=http://localhost:8000/api
 ```
 
-For a physical phone, use `--dart-define=LANDFOCUS_API_URL=http://<PC-LAN-IP>:8000/api`,
-allow port 8000 through the Windows firewall, and use HTTPS for production.
+For a physical phone, use the computer's LAN IP, for example
+`flutter run -d <device> --dart-define=API_BASE_URL=http://192.168.1.4:8000/api`.
+Keep the phone and computer on the same network and allow port 8000 through the
+Windows firewall. Use HTTPS for production.
 Flutter web calls the API from the browser; Laravel enables CORS for its API
 routes. Configure a specific allowed origin before exposing a production API.
+
+## Flutter Screens
+
+- Splash and first-run onboarding
+- Sign in, registration, forgot-password, and reset-password flows
+- Home, property filters, property detail, inquiry, appointment, and contact
+- Account profile, profile editing, language preferences, and theme settings
+
+Authentication expects `POST /api/v1/auth/login`, `register`,
+`forgot-password`, `reset-password`, and `logout`, plus `GET` and `PATCH
+/api/v1/profile`. Those routes are not present in the copied Laravel backend
+yet; the screens display API errors until the backend auth work is implemented.
 
 ## Public API
 

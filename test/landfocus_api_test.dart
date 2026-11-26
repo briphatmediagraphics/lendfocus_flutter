@@ -1,10 +1,13 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
+import 'package:landfocus_app/models/auth_session.dart';
 import 'package:landfocus_app/models/property.dart';
+import 'package:landfocus_app/services/api_client.dart';
 import 'package:landfocus_app/services/landfocus_api.dart';
+import 'package:landfocus_app/services/session_store.dart';
 
 void main() {
   group('Property.fromJson', () {
@@ -31,18 +34,49 @@ void main() {
   });
 
   group('LandFocusApi', () {
+    test('logs in through the versioned API and parses the session', () async {
+      late RequestOptions request;
+      final api = LandFocusApi(
+        dio: _dio('http://localhost:8000/api', (incoming) {
+          request = incoming;
+          return _response({
+            'success': true,
+            'data': {
+              'access_token': 'session-token',
+              'user': {
+                'id': 42,
+                'name': 'Asha Mushi',
+                'email': 'asha@example.test',
+                'phone': '0712345678',
+                'role': 'customer',
+              },
+            },
+          }, 200);
+        }),
+      );
+
+      final session = await api.login(
+        email: ' asha@example.test ',
+        password: 'a-strong-password',
+      );
+
+      expect(request.uri.path, '/api/v1/auth/login');
+      expect(request.data, {
+        'email': 'asha@example.test',
+        'password': 'a-strong-password',
+      });
+      expect(session.token, 'session-token');
+      expect(session.userId, '42');
+      expect(session.name, 'Asha Mushi');
+      expect(session.role, 'customer');
+    });
+
     test('loads properties with type and limit query parameters', () async {
       late Uri requestedUri;
       final api = LandFocusApi(
-        baseUrl: 'http://localhost:8000/api/',
-        client: MockClient((request) async {
-          requestedUri = request.url;
-          return http.Response(
-            jsonEncode({
-              'data': [_propertyJson],
-            }),
-            200,
-          );
+        dio: _dio('http://localhost:8000/api/', (request) {
+          requestedUri = request.uri;
+          return _response({'data': [_propertyJson]}, 200);
         }),
       );
 
@@ -54,12 +88,11 @@ void main() {
     });
 
     test('sends inquiries as JSON and trims user input', () async {
-      late http.Request request;
+      late RequestOptions request;
       final api = LandFocusApi(
-        baseUrl: 'http://localhost:8000/api',
-        client: MockClient((incoming) async {
+        dio: _dio('http://localhost:8000/api', (incoming) {
           request = incoming;
-          return http.Response('{}', 201);
+          return _response({}, 201);
         }),
       );
 
@@ -72,7 +105,7 @@ void main() {
 
       expect(request.method, 'POST');
       expect(request.headers['content-type'], 'application/json');
-      expect(jsonDecode(request.body), {
+      expect(request.data, {
         'name': 'Asha',
         'phone': '0712345678',
         'message': 'I would like details about this land.',
@@ -84,10 +117,10 @@ void main() {
       'reports Laravel error responses instead of treating them as success',
       () async {
         final api = LandFocusApi(
-          baseUrl: 'http://localhost:8000/api',
-          client: MockClient(
-            (_) async => http.Response(
-              jsonEncode({'message': 'The phone field is required.'}),
+          dio: _dio(
+            'http://localhost:8000/api',
+            (_) => _response(
+              {'message': 'The phone field is required.'},
               422,
             ),
           ),
@@ -108,6 +141,33 @@ void main() {
       },
     );
   });
+
+  test('Dio attaches the saved bearer token and clears it after a 401', () async {
+    final sessionStore = MemorySessionStore();
+    await sessionStore.saveSession(
+      const AuthSession(
+        token: 'expired-token',
+        userId: '7',
+        name: 'Test User',
+        email: 'test@example.test',
+      ),
+    );
+    late RequestOptions request;
+    final dio = createApiClient(
+      baseUrl: 'http://localhost:8000/api',
+      sessionStore: sessionStore,
+    );
+    dio.httpClientAdapter = _MockAdapter((incoming) {
+      request = incoming;
+      return _response({'message': 'Unauthenticated.'}, 401);
+    });
+
+    await expectLater(dio.get('v1/profile'), throwsA(isA<DioException>()));
+    await Future<void>.delayed(Duration.zero);
+
+    expect(request.headers['Authorization'], 'Bearer expired-token');
+    expect(await sessionStore.readSession(), isNull);
+  });
 }
 
 const _propertyJson = {
@@ -120,3 +180,35 @@ const _propertyJson = {
   'currency': 'TZS',
   'images': <String>[],
 };
+
+Dio _dio(String baseUrl, _AdapterHandler handler) {
+  final normalizedBaseUrl = baseUrl.endsWith('/') ? baseUrl : '$baseUrl/';
+  final dio = Dio(BaseOptions(baseUrl: normalizedBaseUrl));
+  dio.httpClientAdapter = _MockAdapter(handler);
+  return dio;
+}
+
+ResponseBody _response(Map<String, dynamic> body, int statusCode) =>
+    ResponseBody.fromString(
+      jsonEncode(body),
+      statusCode,
+      headers: const {'content-type': ['application/json']},
+    );
+
+typedef _AdapterHandler = ResponseBody Function(RequestOptions request);
+
+class _MockAdapter implements HttpClientAdapter {
+  _MockAdapter(this.handler);
+
+  final _AdapterHandler handler;
+
+  @override
+  Future<ResponseBody> fetch(
+    RequestOptions options,
+    Stream<Uint8List>? requestStream,
+    Future<void>? cancelFuture,
+  ) async => handler(options);
+
+  @override
+  void close({bool force = false}) {}
+}

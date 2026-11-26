@@ -1,11 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 import 'app.dart';
+import 'services/api_client.dart';
 import 'services/landfocus_api.dart';
+import 'services/session_store.dart';
 
-const _configuredApiUrl = String.fromEnvironment('LANDFOCUS_API_URL');
+const _configuredApiUrl = String.fromEnvironment(
+  'API_BASE_URL',
+  defaultValue: String.fromEnvironment('LANDFOCUS_API_URL'),
+);
 
 String get _defaultApiUrl {
   if (kIsWeb) return 'http://localhost:8000/api';
@@ -16,9 +20,11 @@ String get _defaultApiUrl {
 }
 
 void main() {
-  final api = LandFocusApi(
+  final sessionStore = SecureSessionStore();
+  final dio = createApiClient(
     baseUrl: _configuredApiUrl.isEmpty ? _defaultApiUrl : _configuredApiUrl,
-    client: http.Client(),
+    sessionStore: sessionStore,
   );
-  runApp(LandFocusApp(api: api));
+  final api = LandFocusApi(dio: dio);
+  runApp(LandFocusApp(api: api, sessionStore: sessionStore));
 }
